@@ -221,9 +221,9 @@ python3 tests/run_tests.py
 🔄 Convert Mode Tests:  ✅ 6/6
 🧪 Edge Case Tests:     ✅ 8/8
 🧠 Refactor Mode Tests: ✅ 2/2
-📦 Jar Detection Tests: ✅ 1/1
+📦 Jar Detection Tests: ✅ 4/4
 
-Results: 26 passed, 0 failed
+Results: 29 passed, 0 failed
 ```
 
 测试覆盖：
@@ -231,6 +231,7 @@ Results: 26 passed, 0 failed
 - Forge ↔ Fabric 双向完整 pipeline
 - 边缘情况：抽象类、变量引用的 modId、多事件处理器、多注册类型
 - 无效 import 清理、配置/网络模块转换、版本变更 TODO
+- Mod 检测：Fabric/Forge/NeoForge jar 元数据解析、classpath 回退检测
 
 ## 📦 发布
 
@@ -266,8 +267,9 @@ MIT
 - 修复正则无法匹配含括号构造函数（如 `new SwordItem()`）的问题
 - 修复 import 转换生成不存在的 Fabric API import 的问题
 - 修复已有 `implements` 子句的类添加 ModInitializer 时产生多余空格
+- 修复分析器中 `Registries\.` 模式误匹配 `ForgeRegistries.` 的问题
 
 **改进：**
-- 新增 10 个测试用例（含边缘情况），测试总数从 16 增至 26
+- 新增 13 个测试用例（含边缘情况、Mod 检测、分析器），测试总数从 16 增至 29
 - Forge→Fabric 转换现在正确清除所有无效的 Forge import
 - Fabric→Forge 多注册类型自动分组，生成独立的 DeferredRegister 声明

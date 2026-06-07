@@ -85,7 +85,7 @@ FABRIC_PATTERNS = {
     ],
     "registry": [
         r"Registry\.register",
-        r"Registries\.",
+        r"\bRegistries\.",
         r"import\s+net\.fabricmc\.fabric\.api\.object\.builder",
     ],
     "networking": [

@@ -322,6 +322,40 @@ def test_detect_fabric():
         assert info["mod_id"] == "testmod"
 run_test("detect Fabric mod", test_detect_fabric)
 
+def test_detect_forge_with_version():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        jar = os.path.join(tmpdir, "test.jar")
+        toml = 'modLoader = "javafml"\nloaderVersion = "[47,)"\n\n[[mods]]\nmodId = "testmod"\ndisplayName = "Test"\n\n[[dependencies.testmod]]\nmodId = "forge"\nmandatory = true\nversionRange = "[47,)"\n\n[[dependencies.testmod]]\nmodId = "minecraft"\nmandatory = true\nversionRange = "[1.20.1,)"\n'
+        with zipfile.ZipFile(jar, "w") as zf:
+            zf.writestr("META-INF/mods.toml", toml)
+        from main import detect_mod_info
+        info = detect_mod_info(jar)
+        assert info["loader"] == "forge"
+        assert info["version"] == "1.20.1"
+        assert info["mod_id"] == "testmod"
+run_test("detect Forge mod with version", test_detect_forge_with_version)
+
+def test_detect_neoforge():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        jar = os.path.join(tmpdir, "test.jar")
+        with zipfile.ZipFile(jar, "w") as zf:
+            zf.writestr("META-INF/neoforge.mods.toml", '[[mods]]\nmodId = "neomod"\ndisplayName = "Neo"\n')
+        from main import detect_mod_info
+        info = detect_mod_info(jar)
+        assert info["loader"] == "neoforge"
+        assert info["mod_id"] == "neomod"
+run_test("detect NeoForge mod", test_detect_neoforge)
+
+def test_detect_fallback_classpath():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        jar = os.path.join(tmpdir, "test.jar")
+        with zipfile.ZipFile(jar, "w") as zf:
+            zf.writestr("net/minecraftforge/common/MinecraftForge.java", "class Foo {}")
+        from main import detect_mod_info
+        info = detect_mod_info(jar)
+        assert info["loader"] == "forge"
+run_test("fallback detection from classpath", test_detect_fallback_classpath)
+
 
 # === SUMMARY ===
 print(f"\n{'='*40}")
