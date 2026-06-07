@@ -194,6 +194,98 @@ public class MyMod implements ModInitializer {
     assert "net.fabricmc" not in r
 run_test("full fabric→forge pipeline", test_fabric_to_forge_pipeline)
 
+# === EDGE CASE TESTS ===
+print("\n🧪 Edge Case Tests:")
+
+def test_abstract_mod_class():
+    c = ConvertMode("1.20.1", "forge", "1.20.1", "fabric")
+    src = '@Mod("mymod")\npublic abstract class BaseMod implements Runnable {\n}'
+    r = c._transform_mod_class(src, "BaseMod.java")
+    assert "public abstract class BaseMod implements Runnable, ModInitializer" in r
+run_test("abstract class with @Mod", test_abstract_mod_class)
+
+def test_mod_with_variable_id():
+    c = ConvertMode("1.20.1", "forge", "1.20.1", "fabric")
+    src = '@Mod(TestMod.MODID)\npublic class TestMod {\n    public static final String MODID = "test";\n}'
+    r = c._transform_mod_class(src, "TestMod.java")
+    assert "implements ModInitializer" in r
+    assert "@Mod" not in r
+run_test("@Mod with variable reference", test_mod_with_variable_id)
+
+def test_multiple_subscribe_events():
+    c = ConvertMode("1.20.1", "forge", "1.20.1", "fabric")
+    src = '''public class MyMod {
+    @SubscribeEvent
+    public void onTick(TickEvent.ServerTickEvent event) {}
+
+    @SubscribeEvent
+    public void onJoin(PlayerLoggedInEvent event) {}
+}'''
+    r = c._convert_file(src, "MyMod.java")
+    assert "onServerTick" in r
+    assert "onPlayerJoin" in r
+    assert "@SubscribeEvent" not in r
+run_test("multiple @SubscribeEvent handlers", test_multiple_subscribe_events)
+
+def test_utility_class_noop():
+    c = ConvertMode("1.20.1", "forge", "1.20.1", "fabric")
+    src = 'public class Utils {\n    public static int add(int a, int b) { return a + b; }\n}'
+    r = c._convert_file(src, "Utils.java")
+    assert "public class Utils" in r
+    assert "add(int a, int b)" in r
+run_test("utility class without @Mod (no-op)", test_utility_class_noop)
+
+def test_fabric_multi_registry_types():
+    c = ConvertMode("1.20.1", "fabric", "1.20.1", "forge")
+    src = '''public class MyMod implements ModInitializer {
+    @Override
+    public void onInitialize() {
+        Registry.register(Registries.ITEM, new Identifier("mymod", "sword"), new SwordItem());
+        Registry.register(Registries.BLOCK, new Identifier("mymod", "ore"), new OreBlock());
+    }
+}'''
+    r = c._convert_file(src, "MyMod.java")
+    assert "DeferredRegister<ITEM>" in r
+    assert "DeferredRegister<BLOCK>" in r
+    assert 'ITEMS.register("sword"' in r
+    assert 'BLOCKS.register("ore"' in r
+run_test("Fabric→Forge multiple registry types", test_fabric_multi_registry_types)
+
+def test_forge_config_to_fabric():
+    c = ConvertMode("1.20.1", "forge", "1.20.1", "fabric")
+    src = '''import net.minecraftforge.common.ForgeConfigSpec;
+public class ModConfig {
+    public static final ForgeConfigSpec.Builder BUILDER = new ForgeConfigSpec.Builder();
+}'''
+    r = c._convert_file(src, "ModConfig.java")
+    assert "ForgeConfigSpec" not in r
+    assert "TODO" in r
+run_test("Forge config → Fabric TODO", test_forge_config_to_fabric)
+
+def test_forge_networking_to_fabric():
+    c = ConvertMode("1.20.1", "forge", "1.20.1", "fabric")
+    src = '''import net.minecraftforge.network.simple.SimpleChannel;
+public class Net {
+    private static final SimpleChannel CH = NetworkRegistry.newSimpleChannel(
+        new ResourceLocation("mymod", "main"), () -> "1.0", s -> true, s -> true
+    );
+}'''
+    r = c._convert_file(src, "Net.java")
+    assert "SimpleChannel" not in r
+    assert "ServerPlayNetworking" in r
+run_test("Forge networking → Fabric", test_forge_networking_to_fabric)
+
+def test_version_change_adds_todo():
+    c = ConvertMode("1.20.1", "forge", "1.21", "forge")
+    src = '''public class ItemData {
+    public void save(CompoundTag tag) {
+        tag.putInt("count", 5);
+    }
+}'''
+    r = c._convert_file(src, "ItemData.java")
+    assert "TODO" in r or "Version change" in r
+run_test("version change 1.20→1.21 adds TODO", test_version_change_adds_todo)
+
 
 # === REFACTOR MODE TESTS ===
 print("\n🧠 Refactor Mode Tests:")

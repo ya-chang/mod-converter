@@ -483,32 +483,41 @@ class ConvertMode:
         matches = list(re.finditer(reg_pattern, content))
 
         if matches:
-            first_match = matches[0]
-            reg_type = first_match.group(1)
-            mod_id = first_match.group(2)
+            # Group matches by registry type
+            by_type = {}
+            for m in matches:
+                reg_type = m.group(1)
+                by_type.setdefault(reg_type, []).append(m)
 
-            # Build DeferredRegister declaration — insert after last import or before class
-            deferred_decl = f'DeferredRegister<{reg_type}> {reg_type.upper()}S = DeferredRegister.create(ForgeRegistries.{reg_type.upper()}S, "{mod_id}");\n'
+            mod_id = matches[0].group(2)
 
             # Replace each registration (reverse order to preserve offsets)
             for m in reversed(matches):
+                reg_type = m.group(1)
                 item_id = m.group(3)
                 factory = m.group(4)
-                reg_call = f'{reg_type.upper()}S.register("{item_id}", () -> {factory})'
+                var_name = f"{reg_type.upper()}S"
+                reg_call = f'{var_name}.register("{item_id}", () -> {factory})'
                 content = content[:m.start()] + reg_call + content[m.end():]
 
-            # Insert DeferredRegister after last import statement
+            # Build DeferredRegister declarations for each type
+            deferred_decls = ""
+            for reg_type in by_type:
+                var_name = f"{reg_type.upper()}S"
+                deferred_decls += f'DeferredRegister<{reg_type}> {var_name} = DeferredRegister.create(ForgeRegistries.{var_name}, "{mod_id}");\n'
+
+            # Insert DeferredRegister declarations after last import statement
             last_import = content.rfind('\nimport ')
             if last_import >= 0:
                 end_of_line = content.find('\n', last_import + 1)
-                content = content[:end_of_line + 1] + '\n' + deferred_decl + content[end_of_line + 1:]
+                content = content[:end_of_line + 1] + '\n' + deferred_decls + content[end_of_line + 1:]
             else:
                 # Fallback: insert before first class declaration
                 class_match = re.search(r'(?:^|\n)((?:public\s+)?(?:abstract\s+)?(?:class|interface))\s', content)
                 if class_match:
-                    content = content[:class_match.start()] + '\n' + deferred_decl + content[class_match.start():]
+                    content = content[:class_match.start()] + '\n' + deferred_decls + content[class_match.start():]
                 else:
-                    content = deferred_decl + content
+                    content = deferred_decls + content
 
             content = self._add_import(content, "net.minecraftforge.registries.DeferredRegister")
             content = self._add_import(content, "net.minecraftforge.registries.ForgeRegistries")

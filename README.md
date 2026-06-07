@@ -211,15 +211,26 @@ mod-converter/
 python3 tests/run_tests.py
 ```
 
+```bash
+python3 tests/run_tests.py
+```
+
 ```
 🔌 Mapping Tests:      ✅ 6/6
 📊 Analyzer Tests:      ✅ 3/3
-🔄 Convert Mode Tests:  ✅ 4/4
+🔄 Convert Mode Tests:  ✅ 6/6
+🧪 Edge Case Tests:     ✅ 8/8
 🧠 Refactor Mode Tests: ✅ 2/2
 📦 Jar Detection Tests: ✅ 1/1
 
-Results: 16 passed, 0 failed
+Results: 26 passed, 0 failed
 ```
+
+测试覆盖：
+- 基础映射、分析器、重构模式
+- Forge ↔ Fabric 双向完整 pipeline
+- 边缘情况：抽象类、变量引用的 modId、多事件处理器、多注册类型
+- 无效 import 清理、配置/网络模块转换、版本变更 TODO
 
 ## 📦 发布
 
@@ -241,3 +252,22 @@ MIT
 - 更多版本的转换支持
 - 测试用例
 - Bug 修复
+
+## 📝 Changelog
+
+### v1.0.1 (Bug Fixes)
+
+**修复：**
+- 修复 Forge→Fabric 转换中类声明被破坏的严重 bug（正则反向引用错误）
+- 修复 Fabric→Forge 转换中类声明丢失的问题
+- 修复 `@SubscribeEvent` 事件处理器转换全部失效的问题
+- 修复 Fabric→Forge 注册转换中 DeferredRegister 插入位置错误
+- 修复多注册类型（ITEM + BLOCK）全部使用同一变量名的 bug
+- 修复正则无法匹配含括号构造函数（如 `new SwordItem()`）的问题
+- 修复 import 转换生成不存在的 Fabric API import 的问题
+- 修复已有 `implements` 子句的类添加 ModInitializer 时产生多余空格
+
+**改进：**
+- 新增 10 个测试用例（含边缘情况），测试总数从 16 增至 26
+- Forge→Fabric 转换现在正确清除所有无效的 Forge import
+- Fabric→Forge 多注册类型自动分组，生成独立的 DeferredRegister 声明
