@@ -161,16 +161,17 @@ class ConvertMode:
             )
 
         # Add implements ModInitializer (handle abstract classes too)
-        if "implements" in content:
+        if re.search(r'\bimplements\s+', content.split('{')[0] if '{' in content else content):
+            # Class already implements something — append ModInitializer to the list
             content = re.sub(
-                r'(public\s+(?:abstract\s+)?class\s+\w+[^{]*?)\{',
-                r' implements ModInitializer {',
+                r'(public\s+(?:abstract\s+)?class\s+\w+[^{]*?)\bimplements\s+([\w,\s]+)\s*\{',
+                lambda m: f'{m.group(1).rstrip()} implements {m.group(2).strip()}, ModInitializer {{',
                 content, count=1
             )
         else:
             content = re.sub(
                 r'(public\s+(?:abstract\s+)?class\s+\w+)\s*\{',
-                r' implements ModInitializer {',
+                r'\1 implements ModInitializer {',
                 content, count=1
             )
 
@@ -215,9 +216,7 @@ class ConvertMode:
 
         for pattern, mapping in event_mappings.items():
             if re.search(pattern, content):
-                # Remove @SubscribeEvent
-                content = re.sub(r'@SubscribeEvent\s*\n', '', content)
-                # Replace method signature
+                # Replace the full @SubscribeEvent + method signature in one pass
                 content = re.sub(pattern, mapping["replacement"], content)
                 # Add import
                 if mapping["import"] not in content:
@@ -340,6 +339,22 @@ class ConvertMode:
         import_changes = transforms.get("import", {})
         count = 0
         if direction == "forge_to_fabric":
+            # First: remove Forge imports that have no direct Fabric equivalent
+            # (they were handled by event/registry/networking transforms)
+            forge_only_imports = [
+                r'import\s+net\.minecraftforge\.event\.[\w.]+\s*;',
+                r'import\s+net\.minecraftforge\.eventbus\.api\.[\w.]+\s*;',
+                r'import\s+net\.minecraftforge\.event\.RegistryEvent\s*;',
+                r'import\s+net\.minecraftforge\.fml\.[\w.]+\s*;',
+                r'import\s+net\.minecraftforge\.common\.MinecraftForge\s*;',
+            ]
+            for pat in forge_only_imports:
+                removed = re.findall(pat, content)
+                if removed:
+                    content = re.sub(pat + r'\s*\n?', '', content)
+                    count += len(removed)
+
+            # Then: apply specific import mappings
             for old_import, new_import in import_changes.items():
                 if old_import in content:
                     content = content.replace(f"import {old_import}", f"import {new_import}")
@@ -463,7 +478,8 @@ class ConvertMode:
     def _transform_registry_fabric_to_forge(self, content: str, filepath: str) -> str:
         """Transform Fabric direct registration to Forge DeferredRegister."""
         # Registry.register → DeferredRegister pattern
-        reg_pattern = r'Registry\.register\s*\(\s*Registries\.(\w+)\s*,\s*new\s+Identifier\s*\(\s*["\'](\w+)["\']\s*,\s*["\'](\w+)["\']\s*\)\s*,\s*([^)]+)\)'
+        # Use a more robust pattern that handles nested parentheses in factory expressions
+        reg_pattern = r'Registry\.register\s*\(\s*Registries\.(\w+)\s*,\s*new\s+Identifier\s*\(\s*["\'](\w+)["\']\s*,\s*["\'](\w+)["\']\s*\)\s*,\s*((?:new\s+\w+(?:<[^>]*>)?\([^)]*\)|\w+::\w+))\s*\)'
         matches = list(re.finditer(reg_pattern, content))
 
         if matches:
@@ -471,16 +487,28 @@ class ConvertMode:
             reg_type = first_match.group(1)
             mod_id = first_match.group(2)
 
-            # Add DeferredRegister declaration
+            # Build DeferredRegister declaration — insert after last import or before class
             deferred_decl = f'DeferredRegister<{reg_type}> {reg_type.upper()}S = DeferredRegister.create(ForgeRegistries.{reg_type.upper()}S, "{mod_id}");\n'
-            content = deferred_decl + content
 
-            # Replace each registration
+            # Replace each registration (reverse order to preserve offsets)
             for m in reversed(matches):
                 item_id = m.group(3)
                 factory = m.group(4)
                 reg_call = f'{reg_type.upper()}S.register("{item_id}", () -> {factory})'
                 content = content[:m.start()] + reg_call + content[m.end():]
+
+            # Insert DeferredRegister after last import statement
+            last_import = content.rfind('\nimport ')
+            if last_import >= 0:
+                end_of_line = content.find('\n', last_import + 1)
+                content = content[:end_of_line + 1] + '\n' + deferred_decl + content[end_of_line + 1:]
+            else:
+                # Fallback: insert before first class declaration
+                class_match = re.search(r'(?:^|\n)((?:public\s+)?(?:abstract\s+)?(?:class|interface))\s', content)
+                if class_match:
+                    content = content[:class_match.start()] + '\n' + deferred_decl + content[class_match.start():]
+                else:
+                    content = deferred_decl + content
 
             content = self._add_import(content, "net.minecraftforge.registries.DeferredRegister")
             content = self._add_import(content, "net.minecraftforge.registries.ForgeRegistries")

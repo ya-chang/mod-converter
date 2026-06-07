@@ -102,7 +102,18 @@ def test_mod_class_transform():
     r = c._transform_mod_class(src, "MyMod.java")
     assert "ModInitializer" in r
     assert "@Mod" not in r
+    # Verify class declaration is preserved (not corrupted)
+    assert "public class MyMod implements ModInitializer" in r
+    assert r.startswith("import net.fabricmc.api.ModInitializer;")
 run_test("@Mod → ModInitializer", test_mod_class_transform)
+
+def test_mod_class_preserves_existing_implements():
+    c = ConvertMode("1.20.1", "forge", "1.20.1", "fabric")
+    src = '@Mod("mymod")\npublic class MyMod extends SomeBase implements Runnable {\n}'
+    r = c._transform_mod_class(src, "MyMod.java")
+    assert "implements Runnable, ModInitializer" in r
+    assert "public class MyMod extends SomeBase" in r
+run_test("@Mod preserves existing implements", test_mod_class_preserves_existing_implements)
 
 def test_registry_transform():
     c = ConvertMode("1.20.1", "forge", "1.20.1", "fabric")
@@ -143,7 +154,45 @@ public class MyMod {
     assert "fabricmc" in r or "ModInitializer" in r or "Registry" in r
     # Check forge references removed
     assert "ForgeRegistries" not in r
+    # Verify class declaration is correct (not corrupted)
+    assert "public class MyMod implements ModInitializer" in r
+    # Verify event transform worked
+    assert "onServerTick" in r
+    # Verify invalid forge imports are removed
+    assert "net.minecraftforge" not in r
 run_test("full forge→fabric pipeline", test_forge_to_fabric_pipeline)
+
+def test_fabric_to_forge_pipeline():
+    c = ConvertMode("1.20.1", "fabric", "1.20.1", "forge")
+    src = '''package com.test;
+
+import net.fabricmc.api.ModInitializer;
+import net.minecraft.registry.Registry;
+import net.minecraft.registry.Registries;
+import net.minecraft.util.Identifier;
+
+public class MyMod implements ModInitializer {
+    @Override
+    public void onInitialize() {
+        Registry.register(Registries.ITEM, new Identifier("mymod", "diamond_sword"), new SwordItem());
+    }
+}
+'''
+    r = c._convert_file(src, "MyMod.java")
+    # Verify class declaration is preserved
+    assert "public class MyMod" in r
+    # Verify @Mod annotation added
+    assert '@Mod("modid")' in r
+    # Verify DeferredRegister created
+    assert "DeferredRegister<ITEM>" in r
+    assert "ForgeRegistries.ITEMS" in r
+    # Verify registration converted
+    assert 'ITEMS.register("diamond_sword"' in r
+    # Verify onInitialize converted
+    assert "onCommonSetup" in r
+    # Verify Fabric imports removed
+    assert "net.fabricmc" not in r
+run_test("full fabric→forge pipeline", test_fabric_to_forge_pipeline)
 
 
 # === REFACTOR MODE TESTS ===
