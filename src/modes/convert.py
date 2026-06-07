@@ -140,9 +140,14 @@ class ConvertMode:
         # Extract mod ID from @Mod annotation
         mod_id_match = re.search(r'@Mod\s*\(\s*["\']?(\w+)["\']?\s*\)', content)
         mod_id = mod_id_match.group(1) if mod_id_match else "modid"
+        if not mod_id_match:
+            # Handle variable references like @Mod(TestMod.MODID)
+            mod_id_match = re.search(r'@Mod\s*\(\s*([\w.]+)\s*\)', content)
+            if mod_id_match:
+                mod_id = mod_id_match.group(1)
 
         # Remove @Mod annotation
-        content = re.sub(r'@Mod\s*\(\s*["\']?\w+["\']?\s*\)\s*\n?', '', content)
+        content = re.sub(r'@Mod\s*\([^)]*\)\s*\n?', '', content)
 
         # Remove FML lifecycle imports
         content = re.sub(r'import\s+net\.minecraftforge\.fml\.\w+.*\n', '', content)

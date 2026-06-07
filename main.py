@@ -47,10 +47,10 @@ def detect_mod_info(jar_path: str) -> dict:
                     for dep in dep_list:
                         if dep.get("modId") == "forge":
                             info["loader"] = "forge"
+                        elif dep.get("modId") == "minecraft":
                             mc_version = dep.get("versionRange", "")
                             if "[" in mc_version:
                                 info["version"] = mc_version.split("[")[1].split(",")[0].strip()
-                            break
 
         # NeoForge: META-INF/neoforge.mods.toml
         if "META-INF/neoforge.mods.toml" in names:
@@ -144,7 +144,10 @@ Examples:
         print_detected(info)
         print()
 
-        analyzer = Analyzer(args.jar)
+        decompiler = Decompiler()
+        source_dir = decompiler.decompile(args.jar)
+
+        analyzer = Analyzer(args.jar, source_dir=source_dir)
         report = analyzer.analyze(deep=args.deep)
         analyzer.print_report(report)
 
