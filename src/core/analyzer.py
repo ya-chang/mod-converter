@@ -167,11 +167,10 @@ class Analyzer:
             return report
 
         java_files = self._get_java_files(src_dir)
+        report["structure"]["total_files"] = len(java_files)
         if not java_files:
             report["warnings"].append("No Java source files found")
             return report
-
-        report["structure"]["total_files"] = len(java_files)
 
         # Scan each file
         all_imports = set()

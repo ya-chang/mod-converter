@@ -41,7 +41,7 @@ def detect_mod_info(jar_path: str) -> dict:
                 mods = data.get("mods", [{}])
                 if mods:
                     info["mod_id"] = mods[0].get("modId")
-                    info["name"] = mods[0].get("display")
+                    info["name"] = mods[0].get("displayName") or mods[0].get("display")
                 deps = data.get("dependencies", {})
                 for key, dep_list in deps.items():
                     for dep in dep_list:
@@ -60,7 +60,7 @@ def detect_mod_info(jar_path: str) -> dict:
                 mods = data.get("mods", [{}])
                 if mods:
                     info["mod_id"] = mods[0].get("modId")
-                    info["name"] = mods[0].get("display")
+                    info["name"] = mods[0].get("displayName") or mods[0].get("display")
 
         # Fabric: fabric.mod.json
         if "fabric.mod.json" in names:

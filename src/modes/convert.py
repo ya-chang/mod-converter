@@ -224,6 +224,9 @@ class ConvertMode:
                     content = self._add_import(content, mapping["import"])
                 changes += 1
 
+        # Remove any remaining @SubscribeEvent annotations (catch-all)
+        content = re.sub(r'@SubscribeEvent\s*\n', '', content)
+
         # Remove EventBus registration
         content = re.sub(r'MinecraftForge\.EVENT_BUS\.register\s*\([^)]*\)\s*;?\s*\n?', '', content)
 
@@ -309,6 +312,10 @@ class ConvertMode:
         if "ForgeConfigSpec" in content or "ModConfigSpec" in content:
             content = re.sub(r'import\s+net\.minecraftforge\.common\.ForgeConfigSpec\s*;\s*\n?', '', content)
             content = re.sub(r'import\s+net\.minecraftforge\.common\.ModConfigSpec\s*;\s*\n?', '', content)
+            # Replace ForgeConfigSpec.Builder with a placeholder
+            content = content.replace("ForgeConfigSpec.Builder", "/* TODO: Cloth Config Builder */ Object")
+            content = content.replace("ForgeConfigSpec", "/* TODO: Cloth Config */ Object")
+            content = content.replace("ModConfigSpec", "/* TODO: Cloth Config */ Object")
             # Add comment about config migration
             content = "// TODO: Migrate config to Cloth Config API or manual JSON config\n" + content
             self.changes_log.append({"file": filepath, "category": "config", "change": "Config system needs manual migration"})
@@ -323,10 +330,17 @@ class ConvertMode:
 
         import_changes = transforms.get("import", {})
         count = 0
-        for old_import, new_import in import_changes.items():
-            if old_import in content:
-                content = content.replace(f"import {old_import}", f"import {new_import}")
-                count += 1
+        if direction == "forge_to_fabric":
+            for old_import, new_import in import_changes.items():
+                if old_import in content:
+                    content = content.replace(f"import {old_import}", f"import {new_import}")
+                    count += 1
+        elif direction == "fabric_to_forge":
+            # Apply reverse: replace fabric imports with forge imports
+            for forge_import, fabric_import in import_changes.items():
+                if fabric_import in content:
+                    content = content.replace(f"import {fabric_import}", f"import {forge_import}")
+                    count += 1
 
         if count:
             self.changes_log.append({"file": filepath, "category": "imports", "change": f"{count} import transformations"})
