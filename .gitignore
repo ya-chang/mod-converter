@@ -20,9 +20,8 @@ env/
 *.swo
 
 # Build outputs
-*.jar
-*.exe
 *.spec
+# Keep dist/ for release binaries
 
 # Decompiler libs (auto-downloaded)
 lib/cfr-*.jar
