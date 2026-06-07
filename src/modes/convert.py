@@ -160,17 +160,17 @@ class ConvertMode:
                 1
             )
 
-        # Add implements ModInitializer
+        # Add implements ModInitializer (handle abstract classes too)
         if "implements" in content:
             content = re.sub(
-                r'(public\s+class\s+\w+[^{]*?)\{',
-                r'\1 implements ModInitializer {',
+                r'(public\s+(?:abstract\s+)?class\s+\w+[^{]*?)\{',
+                r' implements ModInitializer {',
                 content, count=1
             )
         else:
             content = re.sub(
-                r'(public\s+class\s+\w+)\s*\{',
-                r'\1 implements ModInitializer {',
+                r'(public\s+(?:abstract\s+)?class\s+\w+)\s*\{',
+                r' implements ModInitializer {',
                 content, count=1
             )
 
@@ -225,10 +225,19 @@ class ConvertMode:
                 changes += 1
 
         # Remove any remaining @SubscribeEvent annotations (catch-all)
-        content = re.sub(r'@SubscribeEvent\s*\n', '', content)
+        sub_count = len(re.findall(r'@SubscribeEvent\s*\n?', content))
+        content = re.sub(r'@SubscribeEvent\s*\n?', '', content)
+        if sub_count:
+            changes += sub_count
 
         # Remove EventBus registration
-        content = re.sub(r'MinecraftForge\.EVENT_BUS\.register\s*\([^)]*\)\s*;?\s*\n?', '', content)
+        if re.search(r'MinecraftForge\.EVENT_BUS', content):
+            content = re.sub(r'MinecraftForge\.EVENT_BUS\.register\s*\([^)]*\)\s*;?\s*?', '', content)
+            changes += 1
+
+        # Remove MinecraftForge import if no more references
+        if "MinecraftForge" not in content.replace("import net.minecraftforge.common.MinecraftForge;", ""):
+            content = re.sub(r'import\s+net\.minecraftforge\.common\.MinecraftForge\s*;\s*?', '', content)
 
         if changes:
             self.changes_log.append({"file": filepath, "category": "events", "change": f"{changes} event transformations"})
@@ -379,6 +388,21 @@ class ConvertMode:
         for old_pkg, new_pkg in transforms.get("package", {}).items():
             if old_pkg in content:
                 content = content.replace(old_pkg, new_pkg)
+                count += 1
+
+        # Class name renames
+        class_map = transforms.get("class", {})
+        for old_class, new_class in sorted(class_map.items(), key=lambda x: -len(x[0])):
+            # Only replace standalone class names (word boundary)
+            pattern = r'\b' + re.escape(old_class) + r'\b'
+            if re.search(pattern, content):
+                content = re.sub(pattern, new_class, content)
+                count += 1
+
+        # Method renames
+        for old_method, new_method in transforms.get("method", {}).items():
+            if old_method in content:
+                content = content.replace(old_method, new_method)
                 count += 1
 
         # Version-specific method changes
