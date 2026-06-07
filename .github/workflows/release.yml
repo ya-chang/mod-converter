@@ -1,0 +1,42 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            artifact: mod-converter.exe
+            asset_name: mod-converter-windows-x64.exe
+          - os: ubuntu-latest
+            artifact: mod-converter
+            asset_name: mod-converter-linux-x64
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install pyinstaller
+
+      - name: Build
+        run: pyinstaller --onefile --name mod-converter --console main.py
+
+      - name: Upload to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/${{ matrix.artifact }}
