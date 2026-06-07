@@ -204,6 +204,130 @@ VERSION_CHANGES = {
             },
         ],
     },
+    ("1.12.2", "1.16.5"): {
+        "description": "MAJOR: Flattening update, complete package rename (MCP → Mojang), registry overhaul",
+        "changes": [
+            {
+                "area": "flattening",
+                "old": "Metadata-based block/item IDs (e.g. wool:1)",
+                "new": "Separate registry IDs for each variant",
+                "note": "The Flattening (1.13) split metadata-based blocks into individual registry entries",
+            },
+            {
+                "area": "packages",
+                "old": "net.minecraft.block.Block, net.minecraft.item.Item (MCP names)",
+                "new": "net.minecraft.world.level.block.Block (Mojang/Intermediary)",
+                "note": "Complete package restructuring between 1.12 and 1.16",
+            },
+            {
+                "area": "registry",
+                "old": "GameRegistry, @ObjectHolder",
+                "new": "DeferredRegister, RegistryObject",
+                "note": "Forge registry system completely rewritten",
+            },
+            {
+                "area": "events",
+                "old": "MinecraftForge.EVENT_BUS.register() + @SubscribeEvent",
+                "new": "Same pattern but different event classes",
+                "note": "Event system similar but event classes renamed/restructured",
+            },
+            {
+                "area": "world",
+                "old": "World, IBlockState, BlockPos",
+                "new": "Level, BlockState, BlockPos (renamed but same concept)",
+                "note": "World → Level rename in 1.17, but 1.16 still uses World",
+            },
+            {
+                "area": "capabilities",
+                "old": "ICapabilityProvider with hasCapability/getCapability",
+                "new": "ICapabilityProvider with getCapability + LazyOptional",
+                "note": "Capability API changed in 1.12→1.16",
+            },
+            {
+                "area": "nbt",
+                "old": "NBTTagCompound",
+                "new": "CompoundTag",
+                "note": "NBT class renamed in 1.16 mappings",
+            },
+        ],
+    },
+    ("1.16.5", "1.12.2"): {
+        "description": "Reverse: Mojang mappings → MCP, registry system rollback",
+        "changes": [
+            {
+                "area": "flattening",
+                "old": "Separate registry IDs",
+                "new": "Metadata-based block/item IDs",
+                "note": "Reverse flattening: combine variants back to metadata",
+            },
+            {
+                "area": "packages",
+                "old": "Mojang/Intermediary package names",
+                "new": "MCP package names",
+                "note": "Package names need full reverse mapping",
+            },
+            {
+                "area": "registry",
+                "old": "DeferredRegister, RegistryObject",
+                "new": "GameRegistry, @ObjectHolder",
+                "note": "Old Forge registry system",
+            },
+        ],
+    },
+    ("1.12.2", "1.18.2"): {
+        "description": "MAJOR: Flattening + World gen rewrite + Extended height",
+        "changes": [
+            {
+                "area": "flattening",
+                "note": "Flattening (1.13): metadata → individual registry entries",
+            },
+            {
+                "area": "world_gen",
+                "old": "IWorldGenerator, Biome decorator",
+                "new": "PlacedFeature, ConfiguredFeature (data-driven world gen)",
+                "note": "World generation completely rewritten in 1.18",
+            },
+            {
+                "area": "height",
+                "old": "Y: 0-255",
+                "new": "Y: -64 to 320",
+                "note": "Extended world height in 1.18",
+            },
+        ],
+    },
+    ("1.16.5", "1.17.1"): {
+        "description": "Block/Entity rename: TileEntity→BlockEntity, Container→ScreenHandler",
+        "changes": [
+            {
+                "area": "rename",
+                "old": "TileEntity, Container, World",
+                "new": "BlockEntity, ScreenHandler, Level",
+                "note": "Major class renames in 1.17",
+            },
+        ],
+    },
+    ("1.17.1", "1.18.2"): {
+        "description": "World generation rewrite, extended height",
+        "changes": [
+            {
+                "area": "world_gen",
+                "old": "BiomeLoadingEvent, ore generation",
+                "new": "PlacedFeature, ConfiguredFeature",
+                "note": "Data-driven world generation",
+            },
+        ],
+    },
+    ("1.18.2", "1.19.4"): {
+        "description": "Chat system changes, new commands",
+        "changes": [
+            {
+                "area": "chat",
+                "old": "ITextComponent",
+                "new": "Component with signed messages",
+                "note": "Chat message signing system added",
+            },
+        ],
+    },
 }
 
 # ============================================================
@@ -256,6 +380,54 @@ TEXT_TRANSFORMS = {
         "getOrCreateTag()": "getOrCreateComponent()",
         "setTag(": "setComponent(",
     },
+}
+
+# ============================================================
+# 1.12.x SPECIFIC MAPPINGS (MCP names → Mojang names)
+# ============================================================
+
+LEGACY_MAPPINGS = {
+    # 1.12 MCP → Modern Mojang names
+    "net.minecraft.block.Block": "net.minecraft.world.level.block.Block",
+    "net.minecraft.item.Item": "net.minecraft.world.item.Item",
+    "net.minecraft.item.ItemStack": "net.minecraft.world.item.ItemStack",
+    "net.minecraft.entity.Entity": "net.minecraft.world.entity.Entity",
+    "net.minecraft.entity.player.EntityPlayer": "net.minecraft.world.entity.player.Player",
+    "net.minecraft.world.World": "net.minecraft.world.level.Level",
+    "net.minecraft.util.math.BlockPos": "net.minecraft.core.BlockPos",
+    "net.minecraft.nbt.NBTTagCompound": "net.minecraft.nbt.CompoundTag",
+    "net.minecraft.nbt.NBTTagList": "net.minecraft.nbt.ListTag",
+    "net.minecraft.tileentity.TileEntity": "net.minecraft.block.entity.BlockEntity",
+    "net.minecraft.inventory.Container": "net.minecraft.world.inventory.AbstractContainerMenu",
+    "net.minecraft.client.gui.inventory.GuiContainer": "net.minecraft.client.gui.screens.inventory.AbstractContainerScreen",
+    "net.minecraft.creativetab.CreativeTabs": "net.minecraft.world.item.CreativeModeTab",
+    "net.minecraft.init.Blocks": "net.minecraft.world.level.block.Blocks",
+    "net.minecraft.init.Items": "net.minecraft.world.item.Items",
+    "net.minecraft.util.ResourceLocation": "net.minecraft.resources.ResourceLocation",
+    "net.minecraft.util.text.TextComponentString": "net.minecraft.network.chat.Component",
+    "net.minecraft.util.text.ITextComponent": "net.minecraft.network.chat.Component",
+    "net.minecraft.block.state.IBlockState": "net.minecraft.world.level.block.state.BlockState",
+    "net.minecraft.world.gen.IChunkGenerator": "net.minecraft.world.level.chunk.ChunkGenerator",
+    "net.minecraft.world.chunk.IChunk": "net.minecraft.world.level.chunk.LevelChunk",
+    "net.minecraftforge.fml.common.registry.GameRegistry": "net.minecraftforge.registries.DeferredRegister",
+    "net.minecraftforge.fml.common.event.FMLPreInitializationEvent": "net.minecraftforge.event.lifecycle.FMLCommonSetupEvent",
+    "net.minecraftforge.fml.common.event.FMLInitializationEvent": "net.minecraftforge.event.lifecycle.FMLClientSetupEvent",
+    "net.minecraftforge.fml.common.event.FMLPostInitializationEvent": "net.minecraftforge.event.lifecycle.FMLLoadCompleteEvent",
+    "net.minecraftforge.fml.common.SidedProxy": "Removed in modern Forge",
+    "net.minecraftforge.fml.common.network.NetworkRegistry": "net.minecraftforge.network.NetworkRegistry",
+    "net.minecraftforge.fml.common.network.simpleimpl.SimpleNetworkWrapper": "net.minecraftforge.network.simple.SimpleChannel",
+}
+
+# FABRIC: Modern package paths (1.16+)
+FABRIC_PACKAGE_MAP = {
+    "net.minecraft.block": "net.minecraft.world.level.block",
+    "net.minecraft.item": "net.minecraft.world.item",
+    "net.minecraft.entity": "net.minecraft.world.entity",
+    "net.minecraft.screen": "net.minecraft.world.inventory",
+    "net.minecraft.block.entity": "net.minecraft.world.level.block.entity",
+    "net.minecraft.client.gui.screen.ingame": "net.minecraft.client.gui.screens.inventory",
+    "net.minecraft.util.math": "net.minecraft.core",
+    "net.minecraft.util": "net.minecraft.resources",
 }
 
 # Version-specific text transforms
