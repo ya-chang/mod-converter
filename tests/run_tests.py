@@ -1,0 +1,193 @@
+#!/usr/bin/env python3
+"""Simple test runner (no pytest dependency)."""
+
+import sys
+import os
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+
+passed = 0
+failed = 0
+errors = []
+
+def run_test(name, func):
+    global passed, failed
+    try:
+        func()
+        print(f"  ✅ {name}")
+        passed += 1
+    except Exception as e:
+        print(f"  ❌ {name}: {e}")
+        failed += 1
+        errors.append((name, str(e)))
+
+
+# === MAPPINGS TESTS ===
+print("\n🔌 Mapping Tests:")
+from src.utils.mappings import (
+    FORGE_TO_FABRIC, FABRIC_TO_FORGE, get_mappings,
+    get_version_changes, get_text_transforms,
+)
+
+run_test("FORGE_TO_FABRIC not empty", lambda: None if len(FORGE_TO_FABRIC) > 0 else (_ for _ in ()).throw(AssertionError()))
+run_test("FABRIC_TO_FORGE not empty", lambda: None if len(FABRIC_TO_FORGE) > 0 else (_ for _ in ()).throw(AssertionError()))
+
+def test_get_mappings():
+    m = get_mappings("forge", "fabric")
+    assert len(m) > 0
+    assert all("fabric" in v for v in m.values())
+run_test("get_mappings forge→fabric", test_get_mappings)
+
+def test_version_changes():
+    c = get_version_changes("1.20.1", "1.21")
+    assert "changes" in c
+    assert len(c["changes"]) > 0
+run_test("version changes 1.20.1→1.21", test_version_changes)
+
+def test_text_transforms():
+    t = get_text_transforms("forge", "fabric", "1.20.1", "1.21")
+    assert "package" in t
+    assert "import" in t
+run_test("text transforms", test_text_transforms)
+
+def test_mod_mapping():
+    assert "net.minecraftforge.fml.common.Mod" in FORGE_TO_FABRIC
+    m = FORGE_TO_FABRIC["net.minecraftforge.fml.common.Mod"]
+    assert "ModInitializer" in m["fabric"]
+run_test("mod class mapping", test_mod_mapping)
+
+
+# === ANALYZER TESTS ===
+print("\n📊 Analyzer Tests:")
+from src.core.analyzer import Analyzer, FORGE_PATTERNS, FABRIC_PATTERNS
+import re
+
+def test_forge_detection():
+    sample = '@Mod("testmod")\npublic class TestMod {\n    @SubscribeEvent\n    public void onTick() {}\n}'
+    found = False
+    for cat, patterns in FORGE_PATTERNS.items():
+        for p in patterns:
+            if re.search(p, sample):
+                found = True
+                break
+    assert found, "No Forge patterns detected"
+run_test("Forge pattern detection", test_forge_detection)
+
+def test_fabric_detection():
+    sample = 'public class TestMod implements ModInitializer {\n    Registry.register(Registries.ITEM, ...);\n}'
+    found = False
+    for cat, patterns in FABRIC_PATTERNS.items():
+        for p in patterns:
+            if re.search(p, sample):
+                found = True
+                break
+    assert found, "No Fabric patterns detected"
+run_test("Fabric pattern detection", test_fabric_detection)
+
+def test_class_analysis():
+    a = Analyzer()
+    result = a._analyze_class('@Mod("testmod")\npublic class TestMod {}', "TestMod.java")
+    assert result is not None
+    assert result["name"] == "TestMod"
+run_test("class analysis", test_class_analysis)
+
+
+# === CONVERT MODE TESTS ===
+print("\n🔄 Convert Mode Tests:")
+from src.modes.convert import ConvertMode
+
+def test_mod_class_transform():
+    c = ConvertMode("1.20.1", "forge", "1.20.1", "fabric")
+    src = '@Mod("mymod")\npublic class MyMod {\n    public MyMod() {}\n}'
+    r = c._transform_mod_class(src, "MyMod.java")
+    assert "ModInitializer" in r
+    assert "@Mod" not in r
+run_test("@Mod → ModInitializer", test_mod_class_transform)
+
+def test_registry_transform():
+    c = ConvertMode("1.20.1", "forge", "1.20.1", "fabric")
+    src = 'DeferredRegister<Item> ITEMS = DeferredRegister.create(ForgeRegistries.ITEMS, "mymod");'
+    r = c._transform_registry(src, "ModItems.java")
+    assert "DeferredRegister" not in r
+run_test("DeferredRegister → Registry.register", test_registry_transform)
+
+def test_add_import():
+    c = ConvertMode("1.20.1", "forge", "1.20.1", "fabric")
+    src = 'package com.test;\n\nimport java.util.List;\n\nclass Foo {}'
+    r = c._add_import(src, "net.minecraft.util.Identifier")
+    assert "import net.minecraft.util.Identifier;" in r
+run_test("import insertion", test_add_import)
+
+def test_forge_to_fabric_pipeline():
+    c = ConvertMode("1.20.1", "forge", "1.20.1", "fabric")
+    src = '''package com.test;
+
+import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.registries.DeferredRegister;
+import net.minecraftforge.registries.ForgeRegistries;
+
+@Mod("mymod")
+public class MyMod {
+    DeferredRegister<Item> ITEMS = DeferredRegister.create(ForgeRegistries.ITEMS, "mymod");
+    
+    public MyMod() {
+        MinecraftForge.EVENT_BUS.register(this);
+    }
+    
+    @SubscribeEvent
+    public void onTick(TickEvent.ServerTickEvent event) {}
+}
+'''
+    r = c._convert_file(src, "MyMod.java")
+    # Check key transformations happened
+    assert "fabricmc" in r or "ModInitializer" in r or "Registry" in r
+    # Check forge references removed
+    assert "ForgeRegistries" not in r
+run_test("full forge→fabric pipeline", test_forge_to_fabric_pipeline)
+
+
+# === REFACTOR MODE TESTS ===
+print("\n🧠 Refactor Mode Tests:")
+from src.modes.refactor import RefactorMode
+
+def test_prompt_building():
+    r = RefactorMode("1.20.1", "forge", "1.20.1", "fabric", api_key="test")
+    p = r._build_prompt("class Test {}", "Test.java", "=== PROJECT ===")
+    assert "forge" in p.lower()
+    assert "fabric" in p.lower()
+run_test("prompt building", test_prompt_building)
+
+def test_fallback():
+    r = RefactorMode("1.20.1", "forge", "1.20.1", "fabric", api_key="test")
+    result = r._fallback_convert('@Mod("test")\npublic class Test {}')
+    assert result is not None
+run_test("fallback conversion", test_fallback)
+
+
+# === JAR DETECTION TESTS ===
+print("\n📦 Jar Detection Tests:")
+import tempfile, json, zipfile
+
+def test_detect_fabric():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        meta = {"schemaVersion": 1, "id": "testmod", "version": "1.0.0", "name": "Test", "depends": {"minecraft": ">=1.20.1"}}
+        jar = os.path.join(tmpdir, "test.jar")
+        with zipfile.ZipFile(jar, "w") as zf:
+            zf.writestr("fabric.mod.json", json.dumps(meta))
+            zf.writestr("com/test/Foo.java", "class Foo {}")
+        from main import detect_mod_info
+        info = detect_mod_info(jar)
+        assert info["loader"] == "fabric"
+        assert info["mod_id"] == "testmod"
+run_test("detect Fabric mod", test_detect_fabric)
+
+
+# === SUMMARY ===
+print(f"\n{'='*40}")
+print(f"Results: {passed} passed, {failed} failed")
+if errors:
+    print(f"\nFailed tests:")
+    for name, err in errors:
+        print(f"  - {name}: {err}")
+print()
+sys.exit(1 if failed else 0)

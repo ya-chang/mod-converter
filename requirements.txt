@@ -1,0 +1,9 @@
+# Core dependencies
+# Python 3.11+ has tomllib built-in, no external deps needed
+# For Python 3.10: pip install toml
+
+# Build & packaging (optional)
+pyinstaller>=6.0
+
+# Testing (optional)
+pytest>=7.0
